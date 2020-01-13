@@ -1,49 +1,62 @@
-# babel-plugin-ember-modules-api-polyfill
+# babel-plugin-ember-data-packages-polyfill
 
-[![Greenkeeper badge](https://badges.greenkeeper.io/ember-cli/babel-plugin-ember-modules-api-polyfill.svg)](https://greenkeeper.io/)
+[![Greenkeeper badge](https://badges.greenkeeper.io/ember-data/babel-plugin-ember-data-packages-polyfill.svg)](https://greenkeeper.io/)
 
-> This plugin transforms [JavaScript modules API](https://github.com/emberjs/rfcs/blob/master/text/0176-javascript-module-api.md) import statements
-> back to the legacy "global" ember object syntax
+> This plugin transforms [Packages API](https://github.com/emberjs/rfcs/blob/master/text/0395-ember-data-packages.md)
+> import statements back to the legacy "DS" EmberData import syntax
 
 ## Example
 
 ```js
-import { inject } from "@ember/service"
+import Model, { attr, belongsTo, hasMany } from "@ember-data/model"
 ```
 back to the legacy
 ```js
-const inject = Ember.inject.service
+import DS from 'ember-data';
+const Model = DS.Model;
+const attr = DS.attr;
+const belongsTo = DS.belongsTo;
+const hasMany = DS.hasMany;
 ```
 
 ## Installation
 
-`npm install --save babel-plugin-ember-modules-api-polyfill`
+`npm install --save babel-plugin-ember-data-packages-polyfill`
 
 ## Why
 
-This plugin provides an API polyfill to allow ember addon authors to adopt the new
-[JavaScript modules API](https://github.com/emberjs/rfcs/blob/master/text/0176-javascript-module-api.md) whilst still maintaining backwards 
-compatibility with older versions of Ember that do not support the new modules API.
+This plugin provides an API polyfill to allow ember addon and app authors to adopt the
+[Packages API](https://github.com/emberjs/rfcs/blob/master/text/0395-ember-data-packages.md)
+whilst still maintaining backwards compatibility with older versions of EmberData 
+that do not support this API.
 
-The intention of this Babel plugin is to also allow for a transition period and allow applications to exist in a mixed state whilst transitioning 
-from the old "global" ember object pattern, into the new modular pattern.
+The intention of this Babel Plugin is to also allow for a transition period and allow
+applications to exist in a mixed state whilst transitioning from the old imports to the
+new imports.
+
+It also allows addons that only need to use a small amount of EmberData to do so while
+still supporting applications using all of EmberData.
 
 # How
 
-Using the [ember-rfc176-data](https://github.com/ember-cli/ember-rfc176-data) package, that contains the official mapping of old global
-object names to the new JS modules API import statements, addons that adopt the new API can be transpiled back to the legacy format if Ember-CLI
-detects that the host application ember version does not support the new modules API.
+Using the [@ember-data/rfc395-data](https://github.com/ember-data/ember-data-rfc395-data)
+package, that contains the official mapping of old imports to new package imports, addons
+that adopt the new package imports can be transpiled back to the legacy format if 
+`ember-cli-babel` detects  that the host application ember version does not support the
+new modules API.
 
-The plugin supports both default `import Component from "@ember/component"` and named `import { inject } from "@ember/service"` import statements,
-converting their syntax back to separate `const` variables within the source file. This transpilation is done at compile time by Ember CLI.
+The plugin supports both default `import Model from "@ember-data/model"` and named
+`import { attr } from "@ember-data/model"` import statements, converting their syntax back
+to separate `const` variables within the source file. This transpilation is done at 
+compile time by EmberCLI using `ember-cli-babel`.
 
-In order for ember addon developers to adopt this new API syntax, they must declare a dependency on `ember-cli-babel:v6.6.0` or above in their
-package.json:
+In order for ember addon developers to adopt this new API syntax, they must declare a 
+dependency on `ember-cli-babel:v7.14.0` or above in their `package.json`:
 
 ```json
 {
   "dependencies": {
-    "ember-cli-babel": "^6.6.0"
+    "ember-cli-babel": "^7.14.0"
   }
 }
 ```

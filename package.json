@@ -1,20 +1,23 @@
 {
-  "name": "babel-plugin-ember-modules-api-polyfill",
-  "version": "2.12.0",
-  "description": "Polyfill for Ember JS API.",
+  "name": "babel-plugin-ember-data-packages-polyfill",
+  "version": "0.0.0",
+  "description": "Polyfill for EmberData Packages API.",
   "keywords": [
     "babel-plugin"
   ],
-  "homepage": "https://github.com/ember-cli/babel-plugin-ember-modules-api-polyfill#readme",
+  "homepage": "https://github.com/ember-data/babel-plugin-ember-data-packages-polyfill#readme",
   "bugs": {
-    "url": "https://github.com/ember-cli/babel-plugin-ember-modules-api-polyfill/issues"
+    "url": "https://github.com/ember-data/babel-plugin-ember-packages-polyfill/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ember-cli/babel-plugin-ember-modules-api-polyfill.git"
+    "url": "git+https://github.com/ember-data/babel-plugin-ember-data-packages-polyfill.git"
   },
   "license": "MIT",
-  "author": "Robert Jackson <me@rwjblue.com>",
+  "author": "Chris Thoburn <runspired@gmail.com>",
+  "contributors": [
+    "Robert Jackson <me@rwjblue.com> (https://www.rwjblue.com)"
+  ],
   "main": "src/index.js",
   "directories": {
     "test": "tests"
@@ -25,7 +28,7 @@
     "test": "qunit tests/**/*-test.js"
   },
   "dependencies": {
-    "ember-rfc176-data": "^0.3.12"
+    "@ember-data/rfc395-data": "^0.0.4"
   },
   "devDependencies": {
     "babel-core": "^6.25.0",
@@ -42,7 +45,7 @@
     "registry": "https://registry.npmjs.org"
   },
   "changelog": {
-    "repo": "ember-cli/babel-plugin-ember-modules-api-polyfill",
+    "repo": "ember-data/babel-plugin-ember-data-packages-polyfill",
     "labels": {
       "breaking": ":boom: Breaking Change",
       "enhancement": ":rocket: Enhancement",
