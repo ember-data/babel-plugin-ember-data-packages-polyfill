@@ -104,10 +104,10 @@ describe(`ember-data-packages-polyfill | import-named-multiple`, () => {
 });
 
 // Ensure mapping the default as an alias works
-describe(`ember-data-packages-polyfill:default-as-alias`, () => {
+describe(`ember-data-packages-polyfill | default-as-alias`, () => {
   matches(
-    `import { default as foo } from '@ember/component';var _x = foo;`,
-    `var _x = Ember.Component;`
+    `import { default as foo } from '@ember-data/model';var _x = foo;`,
+    `import DS from "ember-data";var _x = DS.Model;`
   );
 });
 
