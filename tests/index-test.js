@@ -3,15 +3,15 @@
 
 const describe = QUnit.module;
 const it = QUnit.test;
-const babel = require('babel-core');
+const babel = require('@babel/core');
 const Plugin = require('../src');
-const mapping = require('ember-rfc176-data');
+const mapping = require('@ember-data/rfc395-data');
 
 function transform(source, _plugins) {
   let plugins = _plugins || [
     [Plugin],
   ];
-  let result = babel.transform(source, {
+  let result = babel.transformSync(source, {
     plugins,
   });
 
@@ -20,85 +20,91 @@ function transform(source, _plugins) {
 
 function matches(source, expected, only) {
   (only ? QUnit.only : it)(`${source}`, assert => {
-    let actual = transform(source);
+    let actual = transform(source).replace(/\n/g,'');
+    let realExpected = expected.replace(/\n/g,'');
 
-    assert.equal(actual, expected);
+    assert.equal(actual, realExpected);
   });
 }
 
-// Ensure each of the config mappings is mapped correctly
-mapping.forEach(exportDefinition => {
-  const importRoot = exportDefinition.module;
-
-  let importName = exportDefinition.export;
-  if (!importName) {
-    importName = 'default';
-  }
+function testMatch(definition, global) {
+  let importName = definition.export || 'default';
+  let importRoot = definition.module;
   const varName = importName === 'default' ? 'defaultModule' : importName;
   const localName = varName === 'defaultModule' ? varName : `{ ${varName} }`;
 
-  describe(`ember-modules-api-polyfill-${importRoot}-with-${importName}`, () => {
-    matches(
-      `import ${localName} from '${importRoot}';var _x = ${varName}`,
-      `var _x = ${exportDefinition.global};`
-    );
+  matches(
+    `import ${localName} from '${importRoot}';var _x = ${varName}`,
+    `import DS from "ember-data";var _x = ${global};`
+  );
+}
+
+// Ensure each of the config mappings is mapped correctly
+describe(`ember-data-packages-polyfill | Mappings`, () => {
+  mapping.forEach(exportDefinition => {
+    testMatch(exportDefinition, exportDefinition.global);
+
+    if (exportDefinition.replacement) {
+      testMatch(exportDefinition.replacement, exportDefinition.global);
+    }
   });
 });
 
 // Ensure it works in complex scopes
-describe(`ember-modules-api-polyfill-import-complex-scopes`, () => {
+describe(`ember-data-packages-polyfill | import-complex-scopes`, () => {
   matches(
-    `import { isEmpty } from '@ember/utils';
-var _x = someArray.every(item => isEmpty(item));
-var _y = someOtherArray.some((isEmpty, idx) => isEmpty(idx));`,
-    `
-var _x = someArray.every(item => Ember.isEmpty(item));
-var _y = someOtherArray.some((isEmpty, idx) => isEmpty(idx));`
+    `import { attr } from '@ember-data/model';
+var _x = someArray.every(item => attr(item));
+var _y = someOtherArray.some((attr, idx) => attr(idx));`,
+    `import DS from "ember-data";
+var _x = someArray.every(item => DS.attr(item));
+var _y = someOtherArray.some((attr, idx) => attr(idx));`
   );
 });
 
-// Ensure mapping without reference just removes the line
-describe(`ember-modules-api-polyfill-import-without-reference`, () => {
+// Ensure we don't insert an unnecessary import
+describe(`ember-data-packages-polyfill | no-mapped-import`, () => {
   matches(
-    `import { empty } from '@ember/object/computed';`,
-    ``
+    `import Ember from 'ember';`,
+    `import Ember from 'ember';`
+  );
+});
+
+// Ensure mapping without reference just leaves us with the DS import
+describe(`ember-data-packages-polyfill | import-without-reference`, () => {
+  matches(
+    `import Model, { attr } from '@ember-data/model';
+import Adapter from '@ember-data/adapter';`,
+    `import DS from "ember-data";`
   );
 });
 
 // Ensure mapping multiple imports makes multiple variables
-describe(`ember-modules-api-polyfill-import-multiple`, () => {
+describe(`ember-data-packages-polyfill | import-multiple`, () => {
   matches(
-    `import { empty, notEmpty } from '@ember/object/computed';var _x = empty;var _y = notEmpty;`,
-    `var _x = Ember.computed.empty;var _y = Ember.computed.notEmpty;`
-  );
-});
-
-// Ensure jQuery and RSVP imports work
-describe(`ember-modules-api-polyfill-named-as-alias`, () => {
-  matches(
-    `import jQuery from 'jquery'; import RSVP from 'rsvp';var $ = jQuery;var _y = RSVP`,
-    `var $ = Ember.$;var _y = Ember.RSVP;`
+    `import Model, { attr, belongsTo } from '@ember-data/model';var _x = Model;var _y = attr;var _z = belongsTo;`,
+    `import DS from "ember-data";var _x = DS.Model;var _y = DS.attr;var _z = DS.belongsTo;`
   );
 });
 
 // Ensure mapping a named aliased import
-describe(`ember-modules-api-polyfill-named-as-alias`, () => {
+describe(`ember-data-packages-polyfill | named-as-alias`, () => {
   matches(
-    `import { empty as isEmpty } from '@ember/object/computed';var _x = isEmpty;`,
-    `var _x = Ember.computed.empty;`
+    `import { attr as DataAttr } from '@ember-data/model';var _x = DataAttr;`,
+    `import DS from "ember-data";var _x = DS.attr;`
   );
 });
 
 // Ensure mapping a named and aliased import makes multiple named variables
-describe(`ember-modules-api-polyfill-import-named-multiple`, () => {
+describe(`ember-data-packages-polyfill | import-named-multiple`, () => {
   matches(
-    `import { empty, notEmpty as foo } from '@ember/object/computed';var _x = empty;var _y = foo;`,
-    `var _x = Ember.computed.empty;var _y = Ember.computed.notEmpty;`
+    `import { attr, belongsTo as foo } from '@ember-data/model';var _x = attr;var _y = foo;`,
+    `import DS from "ember-data";var _x = DS.attr;var _y = DS.belongsTo;`
   );
 });
 
 // Ensure mapping the default as an alias works
-describe(`ember-modules-api-polyfill-default-as-alias`, () => {
+describe(`ember-data-packages-polyfill:default-as-alias`, () => {
   matches(
     `import { default as foo } from '@ember/component';var _x = foo;`,
     `var _x = Ember.Component;`
@@ -106,7 +112,7 @@ describe(`ember-modules-api-polyfill-default-as-alias`, () => {
 });
 
 // Ensure reexporting things works
-describe(`ember-modules-api-polyfill-reexport`, () => {
+describe(`ember-data-packages-polyfill:reexport`, () => {
   matches(
     `export { default } from '@ember/component';`,
     `export default Ember.Component;`

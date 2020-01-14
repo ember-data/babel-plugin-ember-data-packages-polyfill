@@ -1,7 +1,7 @@
 'use strict';
 
 const path = require('path');
-const mapping = require('ember-rfc176-data');
+const mapping = require('@ember-data/rfc395-data');
 
 function isBlacklisted(blacklist, importPath, exportName) {
   if (Array.isArray(blacklist)) {
@@ -15,7 +15,7 @@ function isBlacklisted(blacklist, importPath, exportName) {
 
 module.exports = function(babel) {
   const t = babel.types;
-  // Flips the ember-rfc176-data mapping into an 'import' indexed object, that exposes the
+  // Flips the @ember-data/rfc395-data mapping into an 'import' indexed object, that exposes the
   // default import as well as named imports, e.g. import {foo} from 'bar'
   const reverseMapping = {};
   mapping.forEach(exportDefinition => {
@@ -28,11 +28,43 @@ module.exports = function(babel) {
     }
 
     reverseMapping[importRoot][importName] = imported;
+
+    if (exportDefinition.replacement ) {
+      let replacementPath = exportDefinition.replacement.module;
+      let importName = exportDefinition.replacement.export;
+      
+      if (!reverseMapping[replacementPath]) {
+        reverseMapping[replacementPath] = {};
+      }
+
+      reverseMapping[replacementPath][importName] = imported;
+    }
   });
 
+  let hasDSImport = false;
+  let hasAnyDataImport = false;
+
   return {
-    name: 'ember-modules-api-polyfill',
+    name: 'ember-data-packages-polyfill',
     visitor: {
+      Program: {
+        enter() {
+          hasDSImport = false;
+          hasAnyDataImport = false;
+        },
+        exit(path) {
+          if (hasAnyDataImport && !hasDSImport) {
+            // add `import DS from 'ember-data';`
+            path.unshiftContainer(
+              'body', 
+              t.ImportDeclaration(
+                [t.ImportDefaultSpecifier(t.identifier('DS'))],
+                t.stringLiteral('ember-data')
+              )
+            );
+          }
+        }
+      },
       ImportDeclaration(path, state) {
         let blacklist = (state.opts && state.opts.blacklist) || [];
         let node = path.node;
@@ -42,11 +74,11 @@ module.exports = function(babel) {
         let specifiers = path.get('specifiers');
         let importPath = node.source.value;
 
-        if (importPath === 'ember') {
-          // For `import Ember from 'ember'`, we can just remove the import
-          // and change `Ember` usage to to global Ember object.
+        if (importPath === 'ember-data') {
+          // For `import DS from 'ember-data'`, we do nothing
           let specifierPath = specifiers.find(specifierPath => {
             if (specifierPath.isImportDefaultSpecifier()) {
+              hasDSImport = true;
               return true;
             }
             // TODO: Use the nice Babel way to throw
@@ -55,16 +87,14 @@ module.exports = function(babel) {
 
           if (specifierPath) {
             let local = specifierPath.node.local;
-            if (local.name !== 'Ember') {
+            // we weren't named DS, we rename
+            if (local.name !== 'DS') {
               replacements.push([
                 local.name,
-                'Ember',
+                'DS',
               ]);
+              hasDSImport = false;
             }
-            removals.push(specifierPath);
-          } else {
-            // import 'ember';
-            path.remove();
           }
         }
 
@@ -73,6 +103,7 @@ module.exports = function(babel) {
 
         // Only walk specifiers if this is a module we have a mapping for
         if (mapping) {
+          hasAnyDataImport = true;
 
           // Iterate all the specifiers and attempt to locate their mapping
           specifiers.forEach(specifierPath => {
