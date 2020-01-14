@@ -20,8 +20,8 @@ function transform(source, _plugins) {
 
 function matches(source, expected, only) {
   (only ? QUnit.only : it)(`${source}`, assert => {
-    let actual = transform(source).replace(/\n/g,'');
-    let realExpected = expected.replace(/\n/g,'');
+    let actual = transform(source).replace(/\n/g, '');
+    let realExpected = expected.replace(/\n/g, '');
 
     assert.equal(actual, realExpected);
   });
@@ -189,68 +189,71 @@ describe(`unknown imports from known module`, () => {
 
 describe(`import then export`, () => {
   matches(
-    `import { capitalize } from '@ember/string';
-export { capitalize };`,
-    `var capitalize = Ember.String.capitalize;
-
-export { capitalize };`
+    `import { attr } from '@ember-data/model';
+export { attr };`,
+    `import DS from "ember-data";var attr = DS.attr;export { attr };`
   );
-  matches(
-    `import { capitalize, camelize } from '@ember/string';
-    camelize("a thing");
-    capitalize("another thing");
-    export { capitalize };`,
-    `var capitalize = Ember.String.capitalize;
 
-Ember.String.camelize("a thing");
-capitalize("another thing");
-export { capitalize };`
+  matches(
+    `import { attr, belongsTo } from '@ember-data/model';
+    attr("a thing");
+    belongsTo("another thing");
+    export { belongsTo };`,
+    `import DS from "ember-data";
+var belongsTo = DS.belongsTo;
+DS.attr("a thing");
+belongsTo("another thing");
+export { belongsTo };`
   );
 });
 
 describe('options', () => {
-  describe('blacklist', () => {
-    it(`allows blacklisting import paths`, assert => {
-      let input = `import { assert } from '@ember/debug';`;
+  describe('disallowedList', () => {
+    it(`allows disallowing import paths`, assert => {
+      let input = `import Model, { attr } from '@ember-data/model';`;
       let actual = transform(input, [
-        [Plugin, { blacklist: ['@ember/debug'] }],
+        [Plugin, { disallowedList: ['@ember-data/model'] }],
       ]);
 
       assert.equal(actual, input);
     });
 
-    it(`allows blacklisting specific named imports`, assert => {
-      let input = `import { assert, inspect } from '@ember/debug';var _x = inspect`;
+    it(`allows disallowing specific named imports`, assert => {
+      let input = `import Model, { attr, belongsTo } from '@ember-data/model';import Store from '@ember-data/store';var _x = Model;var _y = attr;`;
       let actual = transform(input, [
-        [Plugin, { blacklist: { '@ember/debug': ['assert', 'warn', 'deprecate'] } }],
+        [Plugin, { disallowedList: { '@ember-data/model': ['belongsTo'], '@ember-data/store': ['default'] } }],
       ]);
+      let expected = `import DS from "ember-data";
+import { belongsTo } from '@ember-data/model';
+import Store from '@ember-data/store';
+var _x = DS.Model;
+var _y = DS.attr;`;
 
-      assert.equal(actual, `import { assert } from '@ember/debug';var _x = Ember.inspect;`);
+      assert.equal(actual, expected);
     });
 
-    it('does not error when a blacklist is not present', assert => {
-      let input = `import { assert, inspect } from '@ember/debug';var _x = assert; var _y = inspect;`;
+    it('does not error when a disallowedList is not present', assert => {
+      let input = `import { attr, belongsTo } from '@ember-data/model';var _x = attr;var _y = belongsTo;`;
       let actual = transform(input, [
-        [Plugin, { blacklist: { } }],
+        [Plugin, { disallowedList: { } }],
       ]);
+      let expected = `import DS from "ember-data";
+var _x = DS.attr;
+var _y = DS.belongsTo;`;
 
-      assert.equal(actual, `var _x = Ember.assert;var _y = Ember.inspect;`);
+      assert.equal(actual, expected);
     });
   });
 });
 
-describe(`import from 'ember'`, () => {
+describe(`import from 'ember-data'`, () => {
   matches(
-    `import Ember from 'ember';var _x = Ember;`,
-    `var _x = Ember;`
+    `import DS from 'ember-data';var _x = DS;`,
+    `import DS from 'ember-data';var _x = DS;`
   );
   matches(
-    `import Em from 'ember'; var _x = Em;`,
-    `var _x = Ember;`
-  );
-  matches(
-    `import Asdf from 'ember';var _x = Asdf;`,
-    `var _x = Ember;`
+    `import D from 'ember-data';var _x = D;`,
+    `import DS from 'ember-data';var _x = DS;`
   );
   matches(
     `import './foo';`,
@@ -260,11 +263,11 @@ describe(`import from 'ember'`, () => {
 
 describe(`import without specifier is removed`, () => {
   matches(
-    `import 'ember';`,
+    `import 'ember-data';`,
     ``
   );
   matches(
-    `import '@ember/component';`,
+    `import '@ember-data/model';`,
     ``
   );
 });
