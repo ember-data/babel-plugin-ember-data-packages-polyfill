@@ -200,6 +200,7 @@ module.exports = function(babel) {
 
         // Only walk specifiers if this is a module we have a mapping for
         if (mapping) {
+          hasAnyDataImport = true
 
           // Iterate all the specifiers and attempt to locate their mapping
           specifiers.forEach(specifierPath => {

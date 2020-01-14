@@ -112,25 +112,25 @@ describe(`ember-data-packages-polyfill | default-as-alias`, () => {
 });
 
 // Ensure reexporting things works
-describe(`ember-data-packages-polyfill:reexport`, () => {
+describe(`ember-data-packages-polyfill | reexport`, () => {
   matches(
-    `export { default } from '@ember/component';`,
-    `export default Ember.Component;`
+    `export { default } from '@ember-data/store';`,
+    `import DS from "ember-data";export default DS.Store;`
   );
 
   matches(
-    `export { default as Component } from '@ember/component';`,
-    `export var Component = Ember.Component;`
+    `export { default as Store } from '@ember-data/store';`,
+    `import DS from "ember-data";export var Store = DS.Store;`
   );
 
   matches(
-    `export { computed } from '@ember/object';`,
-    `export var computed = Ember.computed;`
+    `export { belongsTo } from '@ember-data/model';`,
+    `import DS from "ember-data";export var belongsTo = DS.belongsTo;`
   );
 
   matches(
-    `export { computed as foo } from '@ember/object';`,
-    `export var foo = Ember.computed;`
+    `export { belongsTo as foo } from '@ember-data/model';`,
+    `import DS from "ember-data";export var foo = DS.belongsTo;`
   );
 
   matches(
@@ -139,23 +139,33 @@ describe(`ember-data-packages-polyfill:reexport`, () => {
   );
 
   it(`throws an error for wildcard imports`, assert => {
-    let input = `import * as debug from '@ember/debug';`;
+    let input = `import * as Modeling from '@ember-data/model';`;
 
     assert.throws(() => {
       transform(input, [
         [Plugin],
       ]);
-    }, 'Using `import * as debug from \'@ember/debug\'` is not supported');
+    }, 'Using `import * as Modeling from \'@ember-data/model\'` is not supported');
+  });
+
+  it(`throws an error for wildcard imports from ember-data`, assert => {
+    let input = `import * as DS from 'ember-data';`;
+
+    assert.throws(() => {
+      transform(input, [
+        [Plugin],
+      ]);
+    }, 'Using `import * as DS from \'ember-data\'` is not supported');
   });
 
   it(`throws an error for wildcard exports`, assert => {
-    let input = `export * from '@ember/object/computed';`;
+    let input = `export * from '@ember-data/model';`;
 
     assert.throws(() => {
       transform(input, [
         [Plugin],
       ]);
-    }, /Wildcard exports from @ember\/object\/computed are currently not possible/);
+    }, /Wildcard exports from @ember-data\/model are currently not possible/);
   });
 
   matches(
@@ -166,14 +176,14 @@ describe(`ember-data-packages-polyfill:reexport`, () => {
 
 // Ensure unknown exports are not removed
 describe(`unknown imports from known module`, () => {
-  it(`allows blacklisting import paths`, assert => {
-    let input = `import { derp } from '@ember/object/computed';`;
+  it(`allows excluding import paths`, assert => {
+    let input = `import { derp } from '@ember-data/model';`;
 
     assert.throws(() => {
       transform(input, [
         [Plugin],
       ]);
-    }, /@ember\/object\/computed does not have a derp export/);
+    }, /@ember-data\/model does not have a derp export/);
   });
 });
 
