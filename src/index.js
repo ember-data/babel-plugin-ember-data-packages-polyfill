@@ -1,21 +1,21 @@
 'use strict';
 
 const path = require('path');
-const mapping = require('ember-rfc176-data');
+const mapping = require('@ember-data/rfc395-data');
 
-function isBlacklisted(blacklist, importPath, exportName) {
-  if (Array.isArray(blacklist)) {
-    return blacklist.indexOf(importPath) > -1;
+function isDisallowed(disallowedList, importPath, exportName) {
+  if (Array.isArray(disallowedList)) {
+    return disallowedList.indexOf(importPath) > -1;
   } else {
-    let blacklistedExports = blacklist[importPath];
+    let disallowedExports = disallowedList[importPath];
 
-    return blacklistedExports && blacklistedExports.indexOf(exportName) > -1;
+    return disallowedExports && disallowedExports.indexOf(exportName) > -1;
   }
 }
 
 module.exports = function(babel) {
   const t = babel.types;
-  // Flips the ember-rfc176-data mapping into an 'import' indexed object, that exposes the
+  // Flips the @ember-data/rfc395-data mapping into an 'import' indexed object, that exposes the
   // default import as well as named imports, e.g. import {foo} from 'bar'
   const reverseMapping = {};
   mapping.forEach(exportDefinition => {
@@ -28,13 +28,45 @@ module.exports = function(babel) {
     }
 
     reverseMapping[importRoot][importName] = imported;
+
+    if (exportDefinition.replacement) {
+      let replacementPath = exportDefinition.replacement.module;
+      let importName = exportDefinition.replacement.export;
+
+      if (!reverseMapping[replacementPath]) {
+        reverseMapping[replacementPath] = {};
+      }
+
+      reverseMapping[replacementPath][importName] = imported;
+    }
   });
 
+  let hasDSImport = false;
+  let hasAnyDataImport = false;
+
   return {
-    name: 'ember-modules-api-polyfill',
+    name: 'ember-data-packages-polyfill',
     visitor: {
+      Program: {
+        enter() {
+          hasDSImport = false;
+          hasAnyDataImport = false;
+        },
+        exit(path) {
+          if (hasAnyDataImport && !hasDSImport) {
+            // add `import DS from 'ember-data';`
+            path.unshiftContainer(
+              'body',
+              t.ImportDeclaration(
+                [t.ImportDefaultSpecifier(t.identifier('DS'))],
+                t.stringLiteral('ember-data')
+              )
+            );
+          }
+        },
+      },
       ImportDeclaration(path, state) {
-        let blacklist = (state.opts && state.opts.blacklist) || [];
+        let disallowedList = (state.opts && state.opts.disallowedList) || [];
         let node = path.node;
         let replacements = [];
         let declarations = [];
@@ -42,29 +74,29 @@ module.exports = function(babel) {
         let specifiers = path.get('specifiers');
         let importPath = node.source.value;
 
-        if (importPath === 'ember') {
-          // For `import Ember from 'ember'`, we can just remove the import
-          // and change `Ember` usage to to global Ember object.
+        if (importPath === 'ember-data') {
+          // For `import DS from 'ember-data'`, we do nothing
           let specifierPath = specifiers.find(specifierPath => {
             if (specifierPath.isImportDefaultSpecifier()) {
+              hasDSImport = true;
               return true;
             }
             // TODO: Use the nice Babel way to throw
-            throw new Error(`Unexpected non-default import from 'ember'`);
+            throw new Error(`Unexpected non-default import from 'ember-data'`);
           });
 
           if (specifierPath) {
             let local = specifierPath.node.local;
-            if (local.name !== 'Ember') {
+            // we weren't named DS, we rename
+            if (local.name !== 'DS') {
               replacements.push([
                 local.name,
-                'Ember',
+                'DS',
               ]);
+              hasDSImport = false;
             }
-            removals.push(specifierPath);
           } else {
-            // import 'ember';
-            path.remove();
+            removals.push(path);
           }
         }
 
@@ -104,7 +136,7 @@ module.exports = function(babel) {
               importName = imported.name;
             }
 
-            if (isBlacklisted(blacklist, importPath, importName)) {
+            if (isDisallowed(disallowedList, importPath, importName)) {
               return;
             }
 
@@ -115,6 +147,7 @@ module.exports = function(babel) {
             if (!global) {
               throw path.buildCodeFrameError(`${importPath} does not have a ${importName} export`);
             }
+            hasAnyDataImport = true;
 
             removals.push(specifierPath);
 
@@ -136,24 +169,28 @@ module.exports = function(babel) {
           });
         }
 
-        if (removals.length > 0 || mapping) {
+        if (replacements.length) {
           replacements.forEach(replacement => {
             let local = replacement[0];
             let global = replacement[1];
             path.scope.rename(local, global);
           });
+        }
 
+        if (removals.length > 0 || mapping) {
           if (removals.length === node.specifiers.length) {
             path.replaceWithMultiple(declarations);
           } else {
             removals.forEach(specifierPath => specifierPath.remove());
-            path.insertAfter(declarations);
+            if (declarations.length) {
+              path.insertAfter(declarations);
+            }
           }
         }
       },
 
       ExportNamedDeclaration(path, state) {
-        let blacklist = (state.opts && state.opts.blacklist) || [];
+        let disallowedList = (state.opts && state.opts.disallowedList) || [];
         let node = path.node;
         if (!node.source) {
           return;
@@ -169,6 +206,7 @@ module.exports = function(babel) {
 
         // Only walk specifiers if this is a module we have a mapping for
         if (mapping) {
+          hasAnyDataImport = true;
 
           // Iterate all the specifiers and attempt to locate their mapping
           specifiers.forEach(specifierPath => {
@@ -190,7 +228,7 @@ module.exports = function(babel) {
             // Determine the import name, either default or named
             let importName = local.name;
 
-            if (isBlacklisted(blacklist, importPath, importName)) {
+            if (isDisallowed(disallowedList, importPath, importName)) {
               return;
             }
 

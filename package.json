@@ -31,7 +31,7 @@
     "@ember-data/rfc395-data": "^0.0.4"
   },
   "devDependencies": {
-    "babel-core": "^6.25.0",
+    "@babel/core": "^7.8.3",
     "lerna-changelog": "^0.8.3",
     "qunit": "^2.9.3",
     "qunit-eslint": "^2.0.0",
@@ -39,7 +39,7 @@
     "release-it-lerna-changelog": "^1.0.3"
   },
   "engines": {
-    "node": "6.* || 8.* || >= 10.*"
+    "node": "10.* || >= 12.*"
   },
   "publishConfig": {
     "registry": "https://registry.npmjs.org"
@@ -66,5 +66,9 @@
     "github": {
       "release": true
     }
+  },
+  "volta": {
+    "node": "13.6.0",
+    "yarn": "1.21.1"
   }
 }
