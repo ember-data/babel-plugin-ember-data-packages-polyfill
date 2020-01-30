@@ -35,7 +35,7 @@ function testMatch(definition, global) {
 
   matches(
     `import ${localName} from '${importRoot}';var _x = ${varName}`,
-    `import DS from "ember-data";var _x = ${global};`
+    `import DS from "ember-data";var ${varName} = ${global};var _x = ${varName};`
   );
 }
 
@@ -57,7 +57,8 @@ describe(`ember-data-packages-polyfill | import-complex-scopes`, () => {
 var _x = someArray.every(item => attr(item));
 var _y = someOtherArray.some((attr, idx) => attr(idx));`,
     `import DS from "ember-data";
-var _x = someArray.every(item => DS.attr(item));
+var attr = DS.attr;
+var _x = someArray.every(item => attr(item));
 var _y = someOtherArray.some((attr, idx) => attr(idx));`
   );
 });
@@ -75,7 +76,7 @@ describe(`ember-data-packages-polyfill | import-without-reference`, () => {
   matches(
     `import Model, { attr } from '@ember-data/model';
 import Adapter from '@ember-data/adapter';`,
-    `import DS from "ember-data";`
+    `import DS from "ember-data";var Model = DS.Model;var attr = DS.attr;var Adapter = DS.Adapter;`
   );
 });
 
@@ -83,7 +84,7 @@ import Adapter from '@ember-data/adapter';`,
 describe(`ember-data-packages-polyfill | import-multiple`, () => {
   matches(
     `import Model, { attr, belongsTo } from '@ember-data/model';var _x = Model;var _y = attr;var _z = belongsTo;`,
-    `import DS from "ember-data";var _x = DS.Model;var _y = DS.attr;var _z = DS.belongsTo;`
+    `import DS from "ember-data";var Model = DS.Model;var attr = DS.attr;var belongsTo = DS.belongsTo;var _x = Model;var _y = attr;var _z = belongsTo;`
   );
 });
 
@@ -91,7 +92,7 @@ describe(`ember-data-packages-polyfill | import-multiple`, () => {
 describe(`ember-data-packages-polyfill | named-as-alias`, () => {
   matches(
     `import { attr as DataAttr } from '@ember-data/model';var _x = DataAttr;`,
-    `import DS from "ember-data";var _x = DS.attr;`
+    `import DS from "ember-data";var DataAttr = DS.attr;var _x = DataAttr;`
   );
 });
 
@@ -99,7 +100,7 @@ describe(`ember-data-packages-polyfill | named-as-alias`, () => {
 describe(`ember-data-packages-polyfill | import-named-multiple`, () => {
   matches(
     `import { attr, belongsTo as foo } from '@ember-data/model';var _x = attr;var _y = foo;`,
-    `import DS from "ember-data";var _x = DS.attr;var _y = DS.belongsTo;`
+    `import DS from "ember-data";var attr = DS.attr;var foo = DS.belongsTo;var _x = attr;var _y = foo;`
   );
 });
 
@@ -107,7 +108,7 @@ describe(`ember-data-packages-polyfill | import-named-multiple`, () => {
 describe(`ember-data-packages-polyfill | default-as-alias`, () => {
   matches(
     `import { default as foo } from '@ember-data/model';var _x = foo;`,
-    `import DS from "ember-data";var _x = DS.Model;`
+    `import DS from "ember-data";var foo = DS.Model;var _x = foo;`
   );
 });
 
@@ -200,8 +201,9 @@ export { attr };`,
     belongsTo("another thing");
     export { belongsTo };`,
     `import DS from "ember-data";
+var attr = DS.attr;
 var belongsTo = DS.belongsTo;
-DS.attr("a thing");
+attr("a thing");
 belongsTo("another thing");
 export { belongsTo };`
   );
@@ -225,9 +227,11 @@ describe('options', () => {
       ]);
       let expected = `import DS from "ember-data";
 import { belongsTo } from '@ember-data/model';
+var Model = DS.Model;
+var attr = DS.attr;
 import Store from '@ember-data/store';
-var _x = DS.Model;
-var _y = DS.attr;`;
+var _x = Model;
+var _y = attr;`;
 
       assert.equal(actual, expected);
     });
@@ -238,8 +242,10 @@ var _y = DS.attr;`;
         [Plugin, { disallowedList: { } }],
       ]);
       let expected = `import DS from "ember-data";
-var _x = DS.attr;
-var _y = DS.belongsTo;`;
+var attr = DS.attr;
+var belongsTo = DS.belongsTo;
+var _x = attr;
+var _y = belongsTo;`;
 
       assert.equal(actual, expected);
     });
@@ -249,11 +255,11 @@ var _y = DS.belongsTo;`;
 describe(`import from 'ember-data'`, () => {
   matches(
     `import DS from 'ember-data';var _x = DS;`,
-    `import DS from 'ember-data';var _x = DS;`
+    `import DS from "ember-data";var _x = DS;`
   );
   matches(
     `import D from 'ember-data';var _x = D;`,
-    `import DS from 'ember-data';var _x = DS;`
+    `import DS from "ember-data";var D = DS;var _x = D;`
   );
   matches(
     `import './foo';`,

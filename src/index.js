@@ -41,44 +41,50 @@ module.exports = function(babel) {
     }
   });
 
-  let hasDSImport = false;
   let hasAnyDataImport = false;
+  let decl = null;
+  let declPath;
 
   return {
     name: 'ember-data-packages-polyfill',
     visitor: {
       Program: {
-        enter() {
-          hasDSImport = false;
+        enter(path) {
           hasAnyDataImport = false;
+          decl = t.ImportDeclaration(
+            [t.ImportDefaultSpecifier(t.identifier('DS'))],
+            t.stringLiteral('ember-data')
+          );
+          path.unshiftContainer(
+            'body',
+            decl
+          );
         },
-        exit(path) {
-          if (hasAnyDataImport && !hasDSImport) {
-            // add `import DS from 'ember-data';`
-            path.unshiftContainer(
-              'body',
-              t.ImportDeclaration(
-                [t.ImportDefaultSpecifier(t.identifier('DS'))],
-                t.stringLiteral('ember-data')
-              )
-            );
+        exit() {
+          if (!hasAnyDataImport) {
+            // remove unnecessary `import DS from 'ember-data';`
+            declPath.remove();
           }
         },
       },
       ImportDeclaration(path, state) {
         let disallowedList = (state.opts && state.opts.disallowedList) || [];
         let node = path.node;
-        let replacements = [];
         let declarations = [];
         let removals = [];
         let specifiers = path.get('specifiers');
         let importPath = node.source.value;
 
+        if (path.node === decl) {
+          declPath = path;
+          return;
+        }
+
         if (importPath === 'ember-data') {
           // For `import DS from 'ember-data'`, we do nothing
           let specifierPath = specifiers.find(specifierPath => {
             if (specifierPath.isImportDefaultSpecifier()) {
-              hasDSImport = true;
+              hasAnyDataImport = true;
               return true;
             }
             // TODO: Use the nice Babel way to throw
@@ -89,15 +95,16 @@ module.exports = function(babel) {
             let local = specifierPath.node.local;
             // we weren't named DS, we rename
             if (local.name !== 'DS') {
-              replacements.push([
-                local.name,
-                'DS',
-              ]);
-              hasDSImport = false;
+              declarations.push(t.variableDeclaration('var', [
+                t.variableDeclarator(
+                  t.identifier(local.name),
+                  t.identifier('DS')
+                ),
+              ]));
             }
-          } else {
-            removals.push(path);
           }
+
+          removals.push(path);
         }
 
         // This is the mapping to use for the import statement
@@ -151,29 +158,13 @@ module.exports = function(babel) {
 
             removals.push(specifierPath);
 
-            if (path.scope.bindings[local.name].referencePaths.find(rp => rp.parent.type === 'ExportSpecifier')) {
-              // not safe to use path.scope.rename directly
-              declarations.push(t.variableDeclaration('var', [
-                t.variableDeclarator(
-                  t.identifier(local.name),
-                  t.identifier(global)
-                ),
-              ]));
-            } else {
-              // Replace the occurences of the imported name with the global name.
-              replacements.push([
-                local.name,
-                global,
-              ]);
-            }
-          });
-        }
-
-        if (replacements.length) {
-          replacements.forEach(replacement => {
-            let local = replacement[0];
-            let global = replacement[1];
-            path.scope.rename(local, global);
+            // not safe to use path.scope.rename directly
+            declarations.push(t.variableDeclaration('var', [
+              t.variableDeclarator(
+                t.identifier(local.name),
+                t.identifier(global)
+              ),
+            ]));
           });
         }
 
@@ -249,7 +240,7 @@ module.exports = function(babel) {
                 globalAsIdentifier
               );
             } else {
-              // Replace the node with a new `var name = Ember.something`
+              // Replace the node with a new `var name = DS.something`
               declaration = t.exportNamedDeclaration(
                 t.variableDeclaration('var', [
                   t.variableDeclarator(
