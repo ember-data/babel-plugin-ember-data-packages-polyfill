@@ -15,6 +15,15 @@ function isDisallowed(disallowedList, importPath, exportName) {
 
 module.exports = function(babel) {
   const t = babel.types;
+
+  function buildGlobalIdentifier(global) {
+    let globalName = global.split('.')[1];
+    return t.MemberExpression(
+      t.identifier('DS'),
+      t.identifier(globalName)
+    );
+  }
+
   // Flips the @ember-data/rfc395-data mapping into an 'import' indexed object, that exposes the
   // default import as well as named imports, e.g. import {foo} from 'bar'
   const reverseMapping = {};
@@ -159,12 +168,14 @@ module.exports = function(babel) {
             removals.push(specifierPath);
 
             // not safe to use path.scope.rename directly
-            declarations.push(t.variableDeclaration('var', [
+            let redeclared = t.variableDeclaration('var', [
               t.variableDeclarator(
                 t.identifier(local.name),
-                t.identifier(global)
+                buildGlobalIdentifier(global)
               ),
-            ]));
+            ]);
+
+            declarations.push(redeclared);
           });
         }
 
@@ -234,7 +245,7 @@ module.exports = function(babel) {
             removals.push(specifierPath);
 
             let declaration;
-            const globalAsIdentifier = t.identifier(global);
+            const globalAsIdentifier = buildGlobalIdentifier(global);
             if (exported.name === 'default') {
               declaration = t.exportDefaultDeclaration(
                 globalAsIdentifier

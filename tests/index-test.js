@@ -6,6 +6,7 @@ const it = QUnit.test;
 const babel = require('@babel/core');
 const Plugin = require('../src');
 const mapping = require('@ember-data/rfc395-data');
+const path = require('path');
 
 function transform(source, _plugins) {
   let plugins = _plugins || [
@@ -278,3 +279,90 @@ describe(`import without specifier is removed`, () => {
   );
 });
 
+describe('AMD', () => {
+  it('conversion works with compilation to AMD modules', assert => {
+    let plugins = [
+      [Plugin],
+      [require.resolve('@babel/plugin-transform-modules-amd'), { noInterop: true }],
+    ];
+    let files = {
+      'foo.js': `export { default } from '@ember-data/store';`,
+      'bem.js': `export { default } from 'ember-data';`,
+      'bar.js': `import Model, { attr } from '@ember-data/model';\nexport var User = Model;export var name = attr;`,
+      'baz.js': `import EmberData from 'ember-data';\nexport var User = EmberData.Model;`,
+    };
+    let transpiled = {};
+    let relative = `${path.resolve(__dirname, '..')}/`;
+    Object.keys(files).forEach(file => {
+      let source = files[file];
+      let result = babel.transformSync(source, {
+        filename: file,
+        moduleIds: true,
+        getModuleId(name) { return name.replace('.js', '').replace(relative, ''); },
+        plugins,
+      });
+
+      transpiled[file] = result.code;
+    });
+
+    function moduleOutput(moduleName, transpiledModuleBodyCode) {
+      return `define("${moduleName}", ["exports", "ember-data"], function (_exports, _emberData) {\n  "use strict";\n\n  Object.defineProperty(_exports, "__esModule", {\n    value: true\n  });\n${transpiledModuleBodyCode}\n});`;
+    }
+
+    let fooOutput = moduleOutput(
+      'foo',
+      assembleLines([
+        `_exports.default = void 0;`,
+        `var _default = _emberData.default.Store;`,
+        `_exports.default = _default;`,
+      ])
+    );
+    let bemOutput = moduleOutput(
+      'bem',
+      assembleLines([
+        `Object.defineProperty(_exports, "default", {`,
+        `  enumerable: true,`,
+        `  get: function () {`,
+        `    return _emberData.default;`,
+        `  }`,
+        `});`,
+      ])
+    );
+    let barOutput = moduleOutput(
+      'bar',
+      assembleLines([
+        `_exports.name = _exports.User = void 0;`,
+        `var Model = _emberData.default.Model;`,
+        `var attr = _emberData.default.attr;`,
+        `var User = Model;`,
+        `_exports.User = User;`,
+        `var name = attr;`,
+        `_exports.name = name;`,
+      ])
+    );
+    let bazOutput = moduleOutput(
+      'baz',
+      assembleLines([
+        `_exports.User = void 0;`,
+        `var EmberData = _emberData.default;`,
+        `var User = EmberData.Model;`,
+        `_exports.User = User;`,
+      ])
+    );
+
+    assert.equal(transpiled['foo.js'], fooOutput);
+    assert.equal(transpiled['bem.js'], bemOutput);
+    assert.equal(transpiled['bar.js'], barOutput);
+    assert.equal(transpiled['baz.js'], bazOutput);
+  });
+});
+
+function leftPad(str, num) {
+  while (num-- > 0) {
+    str = ` ${str}`;
+  }
+  return str;
+}
+function assembleLines(lines, indent = 2) {
+  return lines.map(l => leftPad(l, indent)).join('\n');
+}
